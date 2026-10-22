@@ -21,7 +21,12 @@ public class AuctionScreen extends Screen {
         itemBox = new EditBox(font, cx - 100, 40, 200, 20, Component.literal("Item"));
         itemBox.setMaxLength(48);
         itemBox.setValue(AuctionState.itemLabel);
+        itemBox.setResponder(s -> AuctionState.itemLabel = s);
         addRenderableWidget(itemBox);
+
+        addRenderableWidget(Button.builder(Component.literal("Browse all items"), b ->
+            Minecraft.getInstance().setScreen(new ItemPickerScreen(this)))
+            .bounds(cx - 100, 64, 98, 20).build());
 
         addRenderableWidget(Button.builder(Component.literal("Use held item"), b -> {
             var p = Minecraft.getInstance().player;
@@ -29,13 +34,10 @@ public class AuctionScreen extends Screen {
                 AuctionState.stack = p.getMainHandItem().copy();
                 itemBox.setValue(AuctionState.stack.getHoverName().getString());
             } else status = "Hold an item first.";
-        }).bounds(cx - 100, 64, 200, 20).build());
+        }).bounds(cx + 2, 64, 98, 20).build());
 
-        // preset timers
         String[] labels = {"30s", "1m", "2m", "5m", "10m"};
-        int[] secs = {30, 60, 120, 300, 600};
         for (int i = 0; i < labels.length; i++) {
-            final int s = secs[i];
             final String l = labels[i];
             addRenderableWidget(Button.builder(Component.literal(l), b -> timeBox.setValue(l))
                 .bounds(cx - 100 + i * 40, 106, 38, 20).build());
@@ -43,7 +45,8 @@ public class AuctionScreen extends Screen {
 
         timeBox = new EditBox(font, cx - 100, 134, 200, 20, Component.literal("Time"));
         timeBox.setHint(Component.literal("Custom: 90, 1m30s, 2h..."));
-        timeBox.setValue("1m");
+        timeBox.setValue(AuctionState.timeText);
+        timeBox.setResponder(s -> AuctionState.timeText = s);
         addRenderableWidget(timeBox);
 
         modeBtn = Button.builder(Component.empty(), b -> {
@@ -71,6 +74,10 @@ public class AuctionScreen extends Screen {
             onClose();
         }).bounds(cx + 2, 214, 98, 20).build());
 
+        addRenderableWidget(Button.builder(Component.literal("HUD size & position"), b ->
+            Minecraft.getInstance().setScreen(new HudSettingsScreen(this)))
+            .bounds(cx - 100, 238, 200, 20).build());
+
         refresh();
     }
 
@@ -82,12 +89,17 @@ public class AuctionScreen extends Screen {
     }
 
     @Override
+    public void removed() { AuctionState.save(); }
+
+    @Override
     public void render(GuiGraphics g, int mx, int my, float delta) {
         super.render(g, mx, my, delta);
         g.drawCenteredString(font, "Donut Auction", width / 2, 15, 0xFFFFFFFF);
         g.drawString(font, "Item name", width / 2 - 100, 30, 0xFFAAAAAA);
         g.drawString(font, "Timer presets / custom", width / 2 - 100, 94, 0xFFAAAAAA);
+        if (!AuctionState.stack.isEmpty())
+            g.renderItem(AuctionState.stack, width / 2 + 104, 42);
         if (!status.isEmpty())
-            g.drawCenteredString(font, status, width / 2, 244, 0xFFFF5555);
+            g.drawCenteredString(font, status, width / 2, 266, 0xFFFF5555);
     }
 }

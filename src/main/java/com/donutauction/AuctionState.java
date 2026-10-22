@@ -1,25 +1,34 @@
 package com.donutauction;
 
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.ItemStack;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.*;
 
 public final class AuctionState {
-    // Matches e.g. "Steve paid you $1,500." / "Steve paid you $2.5K" / "$1M"
-    // If DonutSMP changes its wording, edit this one line.
+    // If DonutSMP words payments differently, edit this one line.
     public static final Pattern PAY = Pattern.compile(
         "([\\w.]{3,17}) paid you \\$([\\d,]+(?:\\.\\d+)?)\\s*([kKmMbB])?");
 
     public static boolean active = false;
     public static long endMs = 0;
     public static String itemLabel = "";
+    public static String timeText = "1m";
     public static ItemStack stack = ItemStack.EMPTY;
-    public static boolean totalMode = false;   // false = highest single payment, true = sum of payments
+    public static boolean totalMode = false;
     public static boolean announce = true;
     public static String lastWinner = null;
     public static double lastWinningBid = 0;
+
+    // HUD layout (position is 0..1 across the free screen space)
+    public static float hudX = 0.01f;
+    public static float hudY = 0.01f;
+    public static float hudScale = 1.0f;
+    public static boolean previewHud = false;
 
     public static final Map<String, Double> bids = new HashMap<>();
 
@@ -116,5 +125,34 @@ public final class AuctionState {
         if (!announce) return;
         var p = Minecraft.getInstance().player;
         if (p != null) p.connection.sendChat(msg);
+    }
+
+    // ---- saved settings ----
+    private static Path cfg() {
+        return FabricLoader.getInstance().getConfigDir().resolve("donutauction.properties");
+    }
+
+    public static void load() {
+        try (var in = Files.newInputStream(cfg())) {
+            Properties p = new Properties();
+            p.load(in);
+            hudX = Float.parseFloat(p.getProperty("x", "0.01"));
+            hudY = Float.parseFloat(p.getProperty("y", "0.01"));
+            hudScale = Float.parseFloat(p.getProperty("scale", "1.0"));
+            announce = Boolean.parseBoolean(p.getProperty("announce", "true"));
+            totalMode = Boolean.parseBoolean(p.getProperty("total", "false"));
+        } catch (Exception ignored) { }
+    }
+
+    public static void save() {
+        try (var out = Files.newOutputStream(cfg())) {
+            Properties p = new Properties();
+            p.setProperty("x", String.valueOf(hudX));
+            p.setProperty("y", String.valueOf(hudY));
+            p.setProperty("scale", String.valueOf(hudScale));
+            p.setProperty("announce", String.valueOf(announce));
+            p.setProperty("total", String.valueOf(totalMode));
+            p.store(out, "Donut Auction");
+        } catch (Exception ignored) { }
     }
 }
