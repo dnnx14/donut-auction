@@ -86,6 +86,11 @@ public class AuctionScreen extends Screen {
             Minecraft.getInstance().setScreen(new HudSettingsScreen(this)))
             .bounds(cx - 100, 204, 200, 20).build());
 
+        addRenderableWidget(Button.builder(Component.literal("Hide winner box"), b -> {
+            AuctionState.dismiss();
+            onClose();
+        }).bounds(cx - 100, 228, 200, 20).build());
+
         refresh();
     }
 
@@ -106,6 +111,6 @@ public class AuctionScreen extends Screen {
         if (!AuctionState.stack.isEmpty())
             g.renderItem(AuctionState.stack, width / 2 + 104, 36);
         if (!status.isEmpty())
-            g.drawCenteredString(font, status, width / 2, 228, 0xFFFF5555);
+            g.drawCenteredString(font, status, width / 2, 252, 0xFFFF5555);
     }
 }

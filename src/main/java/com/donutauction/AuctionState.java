@@ -16,6 +16,8 @@ public final class AuctionState {
         "([\\w.]{3,17}) paid you \\$([\\d,]+(?:\\.\\d+)?)\\s*([kKmMbB])?");
 
     public static boolean active = false;
+    public static long endedAt = 0;
+    public static final long RESULT_SHOW_MS = 30_000;  // winner box auto-hides after 30s
     public static boolean ended = false;   // true after an auction finishes, until the next one starts
     public static long endMs = 0;
     public static String itemLabel = "";
@@ -52,6 +54,7 @@ public final class AuctionState {
         if (!active) return;
         active = false;
         ended = true;
+        endedAt = System.currentTimeMillis();
         List<Map.Entry<String, Double>> top = sorted();
         String what = itemLabel.isBlank() ? "the item" : itemLabel;
         if (top.isEmpty()) {
@@ -70,7 +73,15 @@ public final class AuctionState {
     }
 
     public static void tick() {
-        if (active && System.currentTimeMillis() >= endMs) stop(true);
+        long now = System.currentTimeMillis();
+        if (active && now >= endMs) stop(true);
+        if (!active && ended && now - endedAt > RESULT_SHOW_MS) dismiss();
+    }
+
+    /** Hides the result/winner box. */
+    public static void dismiss() {
+        ended = false;
+        lastWinner = null;
     }
 
     public static void onChat(String text) {
