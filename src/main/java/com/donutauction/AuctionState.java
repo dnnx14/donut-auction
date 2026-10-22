@@ -2,6 +2,7 @@ package com.donutauction;
 
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
 import java.nio.file.Files;
@@ -15,9 +16,14 @@ public final class AuctionState {
         "([\\w.]{3,17}) paid you \\$([\\d,]+(?:\\.\\d+)?)\\s*([kKmMbB])?");
 
     public static boolean active = false;
+    public static boolean ended = false;   // true after an auction finishes, until the next one starts
     public static long endMs = 0;
     public static String itemLabel = "";
     public static String timeText = "1m";
+    public static String minText = "";
+    public static String worthText = "";
+    public static double minBid = 0;   // bids below this don't count
+    public static double worth = 0;    // shown on HUD / announced
     public static ItemStack stack = ItemStack.EMPTY;
     public static boolean totalMode = false;
     public static boolean announce = true;
@@ -33,27 +39,34 @@ public final class AuctionState {
     public static final Map<String, Double> bids = new HashMap<>();
 
     public static void start(long seconds) {
+        minBid = Math.max(0, parseMoney(minText));
+        worth = Math.max(0, parseMoney(worthText));
         bids.clear();
         lastWinner = null;
         endMs = System.currentTimeMillis() + seconds * 1000L;
         active = true;
-        say("AUCTION START: " + (itemLabel.isBlank() ? "item" : itemLabel)
-            + " | " + seconds + "s | /pay me your bid! Highest "
-            + (totalMode ? "total" : "payment") + " wins.");
+        ended = false;
     }
 
     public static void stop(boolean announceResult) {
         if (!active) return;
         active = false;
+        ended = true;
         List<Map.Entry<String, Double>> top = sorted();
+        String what = itemLabel.isBlank() ? "the item" : itemLabel;
         if (top.isEmpty()) {
-            if (announceResult) say("AUCTION ENDED: no bids.");
+            local("AUCTION ENDED: no bids for " + what + ".");
             return;
         }
         lastWinner = top.get(0).getKey();
         lastWinningBid = top.get(0).getValue();
-        if (announceResult) say("AUCTION WON by " + lastWinner + " with " + money(lastWinningBid)
-            + " for " + (itemLabel.isBlank() ? "the item" : itemLabel) + "! GG");
+        // always shown to you locally, even if chat announcing is off
+        local("AUCTION WINNER: " + lastWinner + " with " + money(lastWinningBid) + " for " + what + "!");
+    }
+
+    private static void local(String msg) {
+        var p = Minecraft.getInstance().player;
+        if (p != null) p.displayClientMessage(Component.literal(msg), false);
     }
 
     public static void tick() {
@@ -79,15 +92,11 @@ public final class AuctionState {
         String prevLeader = leaderName();
         if (totalMode) bids.merge(name, amt, Double::sum);
         else bids.merge(name, amt, Math::max);
-
-        String newLeader = leaderName();
-        if (!name.equals(prevLeader) && name.equals(newLeader)) {
-            say("New highest bid: " + name + " with " + money(bids.get(name)) + "!");
-        }
     }
 
     public static List<Map.Entry<String, Double>> sorted() {
-        List<Map.Entry<String, Double>> l = new ArrayList<>(bids.entrySet());
+        List<Map.Entry<String, Double>> l = new ArrayList<>();
+        for (var e : bids.entrySet()) if (e.getValue() >= minBid) l.add(e);
         l.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
         return l;
     }
@@ -102,6 +111,23 @@ public final class AuctionState {
         if (v >= 1e6) return String.format("$%.2fM", v / 1e6);
         if (v >= 1e3) return String.format("$%.2fK", v / 1e3);
         return String.format("$%.0f", v);
+    }
+
+    /** "1500", "1,500", "$1.5k", "2m", "1b". Blank = 0, invalid = -1. */
+    public static double parseMoney(String s) {
+        s = s.trim().replace("$", "").replace(",", "");
+        if (s.isEmpty()) return 0;
+        Matcher m = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*([kKmMbB])?").matcher(s);
+        if (!m.matches()) return -1;
+        double v = Double.parseDouble(m.group(1));
+        if (m.group(2) != null) {
+            switch (Character.toLowerCase(m.group(2).charAt(0))) {
+                case 'k' -> v *= 1_000;
+                case 'm' -> v *= 1_000_000;
+                case 'b' -> v *= 1_000_000_000;
+            }
+        }
+        return v;
     }
 
     public static long parseTime(String s) {
@@ -119,12 +145,6 @@ public final class AuctionState {
             }
         }
         return any ? total : -1;
-    }
-
-    private static void say(String msg) {
-        if (!announce) return;
-        var p = Minecraft.getInstance().player;
-        if (p != null) p.connection.sendChat(msg);
     }
 
     // ---- saved settings ----
