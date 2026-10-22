@@ -13,7 +13,9 @@ import java.util.regex.*;
 public final class AuctionState {
     // If DonutSMP words payments differently, edit this one line.
     public static final Pattern PAY = Pattern.compile(
-        "([\\w.]{3,17}) paid you \\$([\\d,]+(?:\\.\\d+)?)\\s*([kKmMbB])?");
+        "(?i)([\\w.]{3,17})\\s+(?:has\\s+)?(?:paid|sent)\\s+you\\s+\\$?\\s*([\\d,]+(?:\\.\\d+)?)\\s*([kmbt])?");
+    private static String lastKey = "";
+    private static long lastKeyAt = 0;
 
     public static boolean active = false;
     public static long endedAt = 0;
@@ -98,11 +100,19 @@ public final class AuctionState {
                 case 'k' -> amt *= 1_000;
                 case 'm' -> amt *= 1_000_000;
                 case 'b' -> amt *= 1_000_000_000;
+                case 't' -> amt *= 1_000_000_000_000.0;
             }
         }
-        String prevLeader = leaderName();
+        // the same payment can show up in chat AND the action bar: count it once
+        long now = System.currentTimeMillis();
+        String key = name + "|" + amt;
+        if (key.equals(lastKey) && now - lastKeyAt < 1500) return;
+        lastKey = key;
+        lastKeyAt = now;
+
         if (totalMode) bids.merge(name, amt, Double::sum);
         else bids.merge(name, amt, Math::max);
+
     }
 
     public static List<Map.Entry<String, Double>> sorted() {
