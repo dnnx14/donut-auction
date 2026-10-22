@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "donutauction",
+  "version": "${version}",
+  "name": "Donut Auction",
+  "description": "Auction HUD: pick an item, set a timer, and the highest /pay wins.",
+  "environment": "client",
+  "entrypoints": { "client": ["com.donutauction.AuctionMod"] },
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
