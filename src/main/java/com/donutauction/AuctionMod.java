@@ -45,7 +45,7 @@ public class AuctionMod implements ClientModInitializer {
         if (mc.options.hideGui) return;
 
         boolean preview = AuctionState.previewHud;
-        boolean showResult = !AuctionState.active && AuctionState.lastWinner != null;
+        boolean showResult = !AuctionState.active && AuctionState.ended;
         boolean sample = preview && !AuctionState.active && !showResult;
         if (!AuctionState.active && !showResult && !preview) return;
 
@@ -54,8 +54,12 @@ public class AuctionMod implements ClientModInitializer {
         if (sample) top = List.of(Map.entry("Steve", 1_500_000.0), Map.entry("Alex", 900_000.0));
         int rows = Math.min(3, top.size());
 
-        int w = 170;
-        int h = 44 + (rows > 0 ? 4 + rows * 11 : 0);
+        boolean fin = AuctionState.ended && !AuctionState.active && !top.isEmpty();
+        String winLine = fin ? "WINNER: " + top.get(0).getKey() + " " + AuctionState.money(top.get(0).getValue()) : "";
+        int w = Math.max(170, fin ? f.width(winLine) + 14 : 0);
+        int extras = (AuctionState.worth > 0 ? 1 : 0) + (AuctionState.minBid > 0 ? 1 : 0);
+        int off = extras * 11;
+        int h = 44 + off + (rows > 0 ? 4 + rows * 11 : 0);
         float s = AuctionState.hudScale;
         float px = Math.max(0, g.guiWidth() - w * s) * AuctionState.hudX;
         float py = Math.max(0, g.guiHeight() - h * s) * AuctionState.hudY;
@@ -65,6 +69,12 @@ public class AuctionMod implements ClientModInitializer {
         g.pose().scale(s, s);
 
         g.fill(0, 0, w, h, 0x90000000);
+        if (fin) {
+            g.fill(0, 0, w, 1, 0xFFFFD700);
+            g.fill(0, h - 1, w, h, 0xFFFFD700);
+            g.fill(0, 0, 1, h, 0xFFFFD700);
+            g.fill(w - 1, 0, w, h, 0xFFFFD700);
+        }
 
         ItemStack icon = AuctionState.stack;
         if (icon.isEmpty() && sample) icon = new ItemStack(Items.DIAMOND);
@@ -82,18 +92,29 @@ public class AuctionMod implements ClientModInitializer {
         } else if (sample) {
             g.drawString(f, "Time: 01:00", 6, 24, 0xFFFFFFFF);
         } else {
-            g.drawString(f, "ENDED - WINNER", 6, 24, 0xFF55FF55);
+            g.drawString(f, "AUCTION ENDED", 6, 24, 0xFFFF5555);
+        }
+
+        int ly = 35;
+        if (AuctionState.worth > 0) {
+            g.drawString(f, "Worth: " + AuctionState.money(AuctionState.worth), 6, ly, 0xFF55FFFF);
+            ly += 11;
+        }
+        if (AuctionState.minBid > 0) {
+            g.drawString(f, "Min bid: " + AuctionState.money(AuctionState.minBid), 6, ly, 0xFFFFAA00);
+            ly += 11;
         }
 
         if (top.isEmpty()) {
-            g.drawString(f, "No bids yet", 6, 35, 0xFFAAAAAA);
+            g.drawString(f, AuctionState.ended ? "No bids - no winner" : "No bids yet", 6, ly, 0xFFAAAAAA);
         } else {
-            g.drawString(f, "Lead: " + top.get(0).getKey() + " " + AuctionState.money(top.get(0).getValue()),
-                6, 35, 0xFF55FF55);
+            String lead = fin ? winLine
+                : "Lead: " + top.get(0).getKey() + " " + AuctionState.money(top.get(0).getValue());
+            g.drawString(f, lead, 6, ly, fin ? 0xFFFFD700 : 0xFF55FF55);
             for (int i = 0; i < rows; i++) {
-                var e = top.get(i);
-                g.drawString(f, (i + 1) + ". " + e.getKey() + " " + AuctionState.money(e.getValue()),
-                    6, 48 + i * 11, i == 0 ? 0xFFFFFFFF : 0xFFBBBBBB);
+                var en = top.get(i);
+                g.drawString(f, (i + 1) + ". " + en.getKey() + " " + AuctionState.money(en.getValue()),
+                    6, 48 + off + i * 11, i == 0 ? 0xFFFFFFFF : 0xFFBBBBBB);
             }
         }
 
